@@ -32,11 +32,13 @@ RUN echo "deb https://packages.adoptium.net/artifactory/deb $(awk -F= '/^VERSION
 # Update and install packages
 RUN apt-get update && apt-get install -y temurin-17-jdk
 
-WORKDIR /usr/src
+WORKDIR /usr/bin
 RUN curl -fL "https://github.com/coursier/launchers/raw/master/cs-x86_64-pc-linux.gz" | gzip -d > cs
 RUN chmod +x cs
-RUN ./cs setup --apps sbt,scala-cli --install-dir /usr/bin
-#ENV PATH="$PATH:~/.local/share/coursier/bin"
+RUN cs setup --apps sbt,scala-cli --install-dir /usr/bin
+RUN echo $(cs java-home)
+ENV PATH="$PATH:/usr/lib/jvm/temurin-17-jdk-amd64"
+RUN echo $PATH
 
 WORKDIR /usr/src/
 # Somehow
@@ -45,7 +47,10 @@ WORKDIR /usr/src/tydi-lang-2-chisel
 RUN sbt publishLocal
 
 WORKDIR /root
+RUN curl -O -L https://github.com/chipsalliance/chisel/releases/latest/download/chisel-example.scala
 RUN scala-cli chisel-example.scala
+
+RUN find -O3 / -name java
 
 # Copy executables compiled in the Rust image
 COPY --from=rust /usr/src/tydi-lang-2/target/release/tydi-lang-complier /usr/bin/
