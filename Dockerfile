@@ -41,14 +41,24 @@ RUN scala-cli chisel-example.scala
 RUN ln -s $(find -O3 /root/.cache/coursier/arc/https/github.com/adoptium/temurin17-binaries -name java) /usr/bin/java
 
 WORKDIR /usr/src/
-# Somehow
+# Get Tydi-Chisel and execute a local publish
+RUN git clone --depth 1 https://github.com/abs-tudelft/Tydi-Chisel.git
+WORKDIR /usr/src/Tydi-Chisel
+RUN sbt publishLocal
+
+WORKDIR /usr/src/
+# Clone and install Tydi-lang-2-Chisel
 RUN git clone --depth 1 https://github.com/ccromjongh/tydi-lang-2-chisel.git
 WORKDIR /usr/src/tydi-lang-2-chisel
-RUN sbt publishLocal
+RUN chmod -R +x tl2chisel/
+RUN pip3 install -e .
+RUN ln -s /usr/src/tydi-lang-2-chisel/tl2chisel/tl2chisel.py /usr/bin/tl2chisel
 
 # Copy executables compiled in the Rust image
 COPY --from=rust /usr/src/tydi-lang-2/target/release/tydi-lang-complier /usr/bin/
 COPY --from=rust /usr/src/til-vhdl/target/release/til-demo /usr/bin/
 COPY --from=rust /usr/src/JSON_hierachy/target/release/json_hierachy /usr/bin/
+
+WORKDIR ~
 
 CMD ["bash"]
