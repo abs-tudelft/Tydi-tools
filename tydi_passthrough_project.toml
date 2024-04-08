@@ -1,0 +1,9 @@
+output_path = "./output"
+
+[properties]
+name = "passthrough"
+top_level_implementation = "bypass_i"
+top_level_implementation_package = "passthrough"
+
+[files]
+tydi_src = ["./passthrough.td"]

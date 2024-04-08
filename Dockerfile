@@ -59,6 +59,18 @@ COPY --from=rust /usr/src/tydi-lang-2/target/release/tydi-lang-complier /usr/bin
 COPY --from=rust /usr/src/til-vhdl/target/release/til-demo /usr/bin/
 COPY --from=rust /usr/src/JSON_hierachy/target/release/json_hierachy /usr/bin/
 
-WORKDIR ~
+WORKDIR /usr/bin
+# Command for getting latest firtool
+#RUN curl -fL "https://github.com/llvm/circt/releases/latest/download/firrtl-bin-linux-x64.tar.gz" | tar -zx --strip-components 2
+# Get firtool 1.43 for Chisel 5.1
+RUN curl -fL "https://github.com/llvm/circt/releases/download/firtool-1.43.0/firrtl-bin-ubuntu-20.04.tar.gz" | tar -zx --strip-components 2
+
+WORKDIR /root
+
+COPY passthrough.td .
+COPY tydi_passthrough_project.toml .
+RUN tydi-lang-complier -c tydi_passthrough_project.toml
+RUN tl2chisel output/ output/json_IR.json
+RUN scala-cli output/json_IR_generation_stub.scala output/json_IR_main.scala
 
 CMD ["bash"]
