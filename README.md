@@ -12,7 +12,22 @@ The tools included, together with the necessary software to run them, are:
 - [TIL](https://github.com/matthijsr/til-vhdl) – The Tydi Intermediate Representation to VHDL compiler  
   _Note: not actively maintained anymore_
 
+## Usage
+
+To use the container, build the image.
+
+```bash
+docker build -t tydi-tools .
+```
+
+Then, run the container with terminal like:
+
+```bash
+docker run -it --rm --name tydi-tools-container -v .:/root/tvlsi-example tydi-tools /bin/bash
+```
+
 The container contains some example files for a simple passthrough to test with. The commands to compile this project to Verilog from the Tydi-lang description are as follows:
+
 ```shell
 tydi-lang-complier -c tydi_passthrough_project.toml
 tl2chisel output/ output/json_IR.json
@@ -20,6 +35,7 @@ scala-cli output/json_IR_generation_stub.scala output/json_IR_main.scala
 ```
 Commands will look similar for a custom project. See the details of the specific tools for configuration specifics.
 
+## Container contents
 The following commands are available inside the container:
 
 - Tydi tools
