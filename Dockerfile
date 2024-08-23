@@ -28,8 +28,16 @@ RUN apt-get install -y python3-dev graphviz
 
 WORKDIR /usr/bin
 # Install coursier and with it install sbt and scala-cli
-RUN curl -fL "https://github.com/coursier/launchers/raw/master/cs-x86_64-pc-linux.gz" | gzip -d > cs
-RUN chmod +x cs
+RUN ARCH=$(uname -m) && \
+    if [ "$ARCH" = "x86_64" ]; then \
+        URL="https://github.com/coursier/launchers/raw/master/cs-x86_64-pc-linux.gz"; \
+    elif [ "$ARCH" = "aarch64" ]; then \
+        URL="https://github.com/VirtusLab/coursier-m1/releases/latest/download/cs-aarch64-pc-linux.gz"; \
+    else \
+        echo "Unsupported architecture: $ARCH"; exit 1; \
+    fi && \
+    curl -fL "$URL" | gzip -d > /usr/local/bin/cs && \
+    chmod +x /usr/local/bin/cs
 RUN echo "n" | cs setup --apps sbt,scala-cli --install-dir /usr/bin
 
 WORKDIR /root
