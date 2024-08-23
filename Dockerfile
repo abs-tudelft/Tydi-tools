@@ -1,4 +1,5 @@
-FROM rust:latest as rust
+# amd64 must be used as there is no aarch64 build available for firtool
+FROM --platform=linux/amd64 rust:latest AS rust
 
 # Required for building JSON_hierachy
 RUN apt-get update && apt-get install -y python3-dev
@@ -20,7 +21,8 @@ RUN git clone --depth 1 https://github.com/matthijsr/til-vhdl.git
 WORKDIR /usr/src/til-vhdl
 RUN cargo build --release
 
-FROM python:3.12-bookworm as python
+# amd64 must be used as there is no aarch64 build available for firtool
+FROM --platform=linux/amd64 python:3.12-bookworm AS python
 LABEL authors="Casper Cromjongh"
 
 RUN apt-get update
@@ -28,6 +30,7 @@ RUN apt-get install -y python3-dev graphviz
 
 WORKDIR /usr/bin
 # Install coursier and with it install sbt and scala-cli
+# This is available for arm, but cannot be used for now
 RUN ARCH=$(uname -m) && \
     if [ "$ARCH" = "x86_64" ]; then \
         URL="https://github.com/coursier/launchers/raw/master/cs-x86_64-pc-linux.gz"; \

@@ -20,6 +20,8 @@ To use the container, build the image.
 docker build -t tydi-tools .
 ```
 
+> For ARM architectures, x86 emulation must be used as there is no `aarch64` build available for `firtool`. This goes automatically through Rosetta 2 on OSx and qemu on Linux.
+
 Then, run the container with terminal like:
 
 ```bash
