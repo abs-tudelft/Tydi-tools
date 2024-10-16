@@ -6,12 +6,6 @@ RUN apt-get update && apt-get install -y python3-dev
 
 # Clone and compile various Rust-based Tydi tools
 WORKDIR /usr/src/
-ENV PYO3_PYTHON=/usr/bin/python3
-RUN git clone --depth 1 --recurse-submodules https://github.com/jhaenen/JSON_hierachy.git
-WORKDIR /usr/src/JSON_hierachy
-RUN cargo build --release
-
-WORKDIR /usr/src/
 RUN git clone --depth 1 https://github.com/twoentartian/tydi-lang-2.git
 WORKDIR /usr/src/tydi-lang-2
 RUN cargo build --release
@@ -21,12 +15,21 @@ RUN git clone --depth 1 https://github.com/matthijsr/til-vhdl.git
 WORKDIR /usr/src/til-vhdl
 RUN cargo build --release
 
+WORKDIR /usr/src/
+ENV PYO3_PYTHON=/usr/bin/python3
+RUN git clone --depth 1 --recurse-submodules https://github.com/abs-tudelft/JSON_hierachy.git
+WORKDIR /usr/src/JSON_hierachy
+RUN cargo build --release
+
 # amd64 must be used as there is no aarch64 build available for firtool
 FROM --platform=linux/amd64 python:3.12-bookworm AS python
 LABEL authors="Casper Cromjongh"
 
 RUN apt-get update
 RUN apt-get install -y python3-dev graphviz
+
+ENV PYTHONPATH=/usr/local/lib/python3.12/site-packages
+RUN pip3 install funcparserlib
 
 WORKDIR /usr/bin
 # Install coursier and with it install sbt and scala-cli
