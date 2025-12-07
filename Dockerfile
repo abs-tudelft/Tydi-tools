@@ -61,6 +61,18 @@ WORKDIR /usr/src/Tydi-Chisel
 RUN sbt publishLocal
 
 WORKDIR /usr/src/
+# Get Tydi-Chisel and execute a local publish
+RUN git clone --depth 1 https://github.com/abs-tudelft/ScalaTydiPayloadKit.git
+WORKDIR /usr/src/ScalaTydiPayloadKit/lib
+RUN sbt publishLocal
+
+WORKDIR /usr/src/
+# Get Tydi-Chisel and execute a local publish
+RUN git clone --depth 1 https://github.com/abs-tudelft/TydiPostProcessorDemo.git
+WORKDIR /usr/src/TydiPostProcessorDemo
+RUN sbt publishLocal
+
+WORKDIR /usr/src/
 # Clone and install Tydi-lang-2-Chisel
 RUN git clone --depth 1 https://github.com/ccromjongh/tydi-lang-2-chisel.git
 WORKDIR /usr/src/tydi-lang-2-chisel
