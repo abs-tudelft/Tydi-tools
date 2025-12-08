@@ -1,8 +1,22 @@
 # amd64 must be used as there is no aarch64 build available for firtool
-FROM --platform=linux/amd64 rust:latest AS rust
+FROM --platform=linux/amd64 rust:1-trixie AS rust
 
 # Required for building JSON_hierachy
-RUN apt-get update && apt-get install -y python3-dev
+RUN apt-get update && apt-get install -y python3-dev openssl libssl-dev libwebkit2gtk-4.1-dev  build-essential curl wget file libxdo-dev libssl-dev libayatana-appindicator3-dev librsvg2-dev && rm -rf /var/lib/apt/lists/*;
+
+RUN cargo install tauri-cli --version "^2.0.0" --locked
+
+WORKDIR /usr/src/
+RUN git clone --depth 1 https://github.com/jarlb/chiseltrace.git
+WORKDIR /usr/src/chiseltrace
+RUN git submodule update --init --recursive
+RUN cargo build --release
+
+WORKDIR /usr/src/
+RUN git clone https://github.com/jarlb/surfer-tywaves.git
+WORKDIR /usr/src/surfer-tywaves
+RUN git submodule update --init --recursive
+RUN cargo build --release
 
 # Clone and compile various Rust-based Tydi tools
 WORKDIR /usr/src/
@@ -22,7 +36,7 @@ WORKDIR /usr/src/JSON_hierachy
 RUN cargo build --release
 
 # amd64 must be used as there is no aarch64 build available for firtool
-FROM --platform=linux/amd64 python:3.12-bookworm AS python
+FROM --platform=linux/amd64 python:3.12-trixie AS python
 LABEL authors="Casper Cromjongh"
 
 RUN apt-get update
@@ -84,6 +98,8 @@ RUN ln -s /usr/src/tydi-lang-2-chisel/tl2chisel/tl2chisel.py /usr/bin/tl2chisel
 COPY --from=rust /usr/src/tydi-lang-2/target/release/tydi-lang-complier /usr/bin/
 COPY --from=rust /usr/src/til-vhdl/target/release/til-demo /usr/bin/
 COPY --from=rust /usr/src/JSON_hierachy/target/release/json_hierachy /usr/bin/
+COPY --from=rust /usr/src/chiseltrace/target/release/chiseltrace /usr/bin/
+COPY --from=rust /usr/src/surfer-tywaves/target/release/surfer-tywaves /usr/bin/
 
 WORKDIR /root
 
@@ -92,5 +108,7 @@ COPY tydi_passthrough_project.toml .
 RUN tydi-lang-complier -c tydi_passthrough_project.toml
 RUN tl2chisel output/ output/json_IR.json
 RUN scala-cli output/json_IR_generation_stub.scala output/json_IR_main.scala
+
+RUN apt-get install -y ibwebkit2gtk-4.1-dev
 
 CMD ["bash"]
