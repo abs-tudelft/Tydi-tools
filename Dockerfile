@@ -125,9 +125,21 @@ WORKDIR /usr/src/tywaves-chisel
 RUN sbt publishLocal
 
 WORKDIR /usr/src/
-# Get the Chiselwatt demo and execute a simulation
+# Get the Chiselwatt demo
 RUN git clone --depth 1 https://github.com/jarlb/chiselwatt.git
 WORKDIR /usr/src/chiselwatt
-#RUN sbt "testOnly *CoreTest"
+# The hex file is normally generated and put in this location by the makefile, we take a shortcut
+RUN ln -sf ./samples/binaries/simple_asm/program.hex ./insns.hex
+# Verilator can be installed as a package luckily
+RUN apt-get install -y verilator
+# Get the firtool and put it in the right place
+ARG FIR_NAME="firtool-type-dbg-info"
+RUN curl -L "https://github.com/rameloni/circt/releases/download/v0.1.5-tywaves-SNAPSHOT/firtool-bin-linux-x64.tar.gz" | tar zx
+RUN chmod +x bin/${FIR_NAME}-0.1.5 && mv bin/${FIR_NAME}-0.1.5 /usr/bin/${FIR_NAME}-0.1.6 && rm -r bin
+# For some reason a specific name is required for surfer
+RUN ln -s /usr/bin/surfer-tywaves /usr/bin/surfer-tywaves-0.3.3
+# Test can finally be ran with
+# sbt "testOnly *CoreTest"
+# It doesn't make much sense to run this in the build proces.
 
 CMD ["bash"]
