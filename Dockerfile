@@ -111,4 +111,23 @@ RUN scala-cli output/json_IR_generation_stub.scala output/json_IR_main.scala
 
 RUN apt-get install -y ibwebkit2gtk-4.1-dev
 
+WORKDIR /usr/src/
+# Get the ChiselTrace version of Chisel and execute a local publish
+RUN git clone https://github.com/jarlb/chisel.git
+WORKDIR /usr/src/chisel
+RUN git checkout chiseltrace
+RUN sbt "unipublish / publishLocal"
+
+WORKDIR /usr/src/
+# Get Tywaves-Chisel and execute a local publish
+RUN git clone --depth 1 https://github.com/jarlb/tywaves-chisel.git
+WORKDIR /usr/src/tywaves-chisel
+RUN sbt publishLocal
+
+WORKDIR /usr/src/
+# Get the Chiselwatt demo and execute a simulation
+RUN git clone --depth 1 https://github.com/jarlb/chiselwatt.git
+WORKDIR /usr/src/chiselwatt
+#RUN sbt "testOnly *CoreTest"
+
 CMD ["bash"]
