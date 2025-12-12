@@ -2,21 +2,9 @@
 FROM --platform=linux/amd64 rust:1-trixie AS rust
 
 # Required for building JSON_hierachy
-RUN apt-get update && apt-get install -y python3-dev openssl libssl-dev libwebkit2gtk-4.1-dev  build-essential curl wget file libxdo-dev libssl-dev libayatana-appindicator3-dev librsvg2-dev && rm -rf /var/lib/apt/lists/*;
+RUN apt-get update && apt-get install -y python3-dev openssl libssl-dev libwebkit2gtk-4.1-dev  build-essential curl wget file libxdo-dev libssl-dev libayatana-appindicator3-dev librsvg2-dev nodejs npm && rm -rf /var/lib/apt/lists/*;
 
 RUN cargo install tauri-cli --version "^2.0.0" --locked
-
-WORKDIR /usr/src/
-RUN git clone --depth 1 https://github.com/jarlb/chiseltrace.git
-WORKDIR /usr/src/chiseltrace
-RUN git submodule update --init --recursive
-RUN cargo build --release
-
-WORKDIR /usr/src/
-RUN git clone https://github.com/jarlb/surfer-tywaves.git
-WORKDIR /usr/src/surfer-tywaves
-RUN git submodule update --init --recursive
-RUN cargo build --release
 
 # Clone and compile various Rust-based Tydi tools
 WORKDIR /usr/src/
@@ -35,12 +23,29 @@ RUN git clone --depth 1 --recurse-submodules https://github.com/abs-tudelft/JSON
 WORKDIR /usr/src/JSON_hierachy
 RUN cargo build --release
 
+WORKDIR /usr/src/
+RUN git clone https://github.com/jarlb/surfer-tywaves.git
+WORKDIR /usr/src/surfer-tywaves
+RUN git submodule update --init --recursive
+RUN cargo build --release
+
+WORKDIR /usr/src/
+RUN git clone --depth 1 https://github.com/jarlb/chiseltrace.git
+WORKDIR /usr/src/chiseltrace
+RUN git submodule update --init --recursive
+WORKDIR /usr/src/chiseltrace/gui
+RUN npm install
+RUN npm i @tauri-apps/api@~2.6
+RUN npm i @tauri-apps/plugin-opener@~2.4
+WORKDIR /usr/src/chiseltrace
+RUN cargo tauri build --no-bundle
+
 # amd64 must be used as there is no aarch64 build available for firtool
 FROM --platform=linux/amd64 python:3.12-trixie AS python
 LABEL authors="Casper Cromjongh"
 
 RUN apt-get update
-RUN apt-get install -y python3-dev graphviz
+RUN apt-get install -y python3-dev graphviz verilator
 
 ENV PYTHONPATH=/usr/local/lib/python3.12/site-packages
 RUN pip3 install funcparserlib
@@ -98,8 +103,6 @@ RUN ln -s /usr/src/tydi-lang-2-chisel/tl2chisel/tl2chisel.py /usr/bin/tl2chisel
 COPY --from=rust /usr/src/tydi-lang-2/target/release/tydi-lang-complier /usr/bin/
 COPY --from=rust /usr/src/til-vhdl/target/release/til-demo /usr/bin/
 COPY --from=rust /usr/src/JSON_hierachy/target/release/json_hierachy /usr/bin/
-COPY --from=rust /usr/src/chiseltrace/target/release/chiseltrace /usr/bin/
-COPY --from=rust /usr/src/surfer-tywaves/target/release/surfer-tywaves /usr/bin/
 
 WORKDIR /root
 
@@ -130,14 +133,16 @@ RUN git clone --depth 1 https://github.com/jarlb/chiselwatt.git
 WORKDIR /usr/src/chiselwatt
 # The hex file is normally generated and put in this location by the makefile, we take a shortcut
 RUN ln -sf ./samples/binaries/simple_asm/program.hex ./insns.hex
-# Verilator can be installed as a package luckily
-RUN apt-get install -y verilator
 # Get the firtool and put it in the right place
 ARG FIR_NAME="firtool-type-dbg-info"
 RUN curl -L "https://github.com/rameloni/circt/releases/download/v0.1.5-tywaves-SNAPSHOT/firtool-bin-linux-x64.tar.gz" | tar zx
 RUN chmod +x bin/${FIR_NAME}-0.1.5 && mv bin/${FIR_NAME}-0.1.5 /usr/bin/${FIR_NAME}-0.1.6 && rm -r bin
+
+COPY --from=rust /usr/src/chiseltrace/target/release/chiseltrace /usr/bin/
+COPY --from=rust /usr/src/surfer-tywaves/target/release/surfer-tywaves /usr/bin/
 # For some reason a specific name is required for surfer
 RUN ln -s /usr/bin/surfer-tywaves /usr/bin/surfer-tywaves-0.3.3
+
 # Test can finally be ran with
 # sbt "testOnly *CoreTest"
 # It doesn't make much sense to run this in the build proces.
