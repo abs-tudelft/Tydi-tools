@@ -101,7 +101,7 @@ WORKDIR /usr/src/tywaves-chisel
 RUN sbt publishLocal
 
 # amd64 must be used as there is no aarch64 build available for firtool
-FROM --platform=linux/amd64 python:3.12-trixie AS python
+FROM --platform=linux/amd64 python:3.12-trixie AS tydi-tools-cli
 LABEL authors="Casper Cromjongh"
 
 WORKDIR /usr/src/
@@ -109,13 +109,15 @@ WORKDIR /usr/src/
 RUN git clone --depth 1 https://github.com/ccromjongh/tydi-lang-2-chisel.git
 WORKDIR /usr/src/tydi-lang-2-chisel
 RUN chmod -R +x tl2chisel/
-RUN pip3 install -e .
+RUN pip3 install -e . --no-cache-dir
 RUN ln -s /usr/src/tydi-lang-2-chisel/tl2chisel/tl2chisel.py /usr/bin/tl2chisel
 
 ENV XDG_CACHE_HOME=/var/cache
 ENV COURSIER_CACHE=/var/cache/coursier
 
-RUN apt-get update && apt-get install -y python3-dev graphviz verilator && rm -rf /var/cache/apt/archives /var/lib/apt/lists/*
+RUN apt-get update &&  \
+    apt-get install -y python3-dev graphviz verilator &&  \
+    rm -rf /var/cache/apt/archives /var/lib/apt/lists/*
 
 ENV PYTHONPATH=/usr/local/lib/python3.12/site-packages
 RUN pip3 install funcparserlib --no-cache-dir
@@ -133,12 +135,14 @@ RUN ARCH=$(uname -m) && \
     fi && \
     curl -fL "$URL" | gzip -d > /usr/local/bin/cs && \
     chmod +x /usr/local/bin/cs
-RUN echo "n" | cs setup --apps sbt,scala-cli --install-dir /usr/bin
+RUN echo "n" | cs setup --apps sbt,scala-cli --install-dir /usr/bin && \
+    rm -rf $COURSIER_CACHE/https
 
 WORKDIR /root
 # Download and run chisel example file to fetch dependencies
 RUN curl -O -L https://github.com/chipsalliance/chisel/releases/latest/download/chisel-example.scala
-RUN scala-cli chisel-example.scala
+RUN scala-cli chisel-example.scala &&  \
+    rm -rf $COURSIER_CACHE/https
 
 # Link the java version that scala-cli downloads to the system location
 RUN ln -s $(find -O3 $COURSIER_CACHE/arc/https/github.com/adoptium/temurin17-binaries -name java) /usr/bin/java
@@ -156,20 +160,28 @@ COPY passthrough.td .
 COPY tydi_passthrough_project.toml .
 RUN tydi-lang-complier -c tydi_passthrough_project.toml
 RUN tl2chisel output/ output/json_IR.json
-RUN scala-cli output/json_IR_generation_stub.scala output/json_IR_main.scala
+RUN scala-cli output/json_IR_generation_stub.scala output/json_IR_main.scala &&  \
+    rm -rf $COURSIER_CACHE/https
+
+FROM tydi-tools-cli AS tydi-tools
+
+RUN apt-get update &&  \
+    apt-get install -y libwebkit2gtk-4.1-dev &&  \
+    rm -rf /var/cache/apt/archives /var/lib/apt/lists/*
 
 WORKDIR /usr/src/
-# Get the Chiselwatt demo
-RUN git clone --depth 1 https://github.com/jarlb/chiselwatt.git
+# Get the Chiselwatt demo, remove the tests folder (not needed for demo, 130 MB)
+RUN git clone --depth 1 https://github.com/jarlb/chiselwatt.git &&  \
+    rm -r chiselwatt/tests
 WORKDIR /usr/src/chiselwatt
 # The hex file is normally generated and put in this location by the makefile, we take a shortcut
 RUN ln -sf ./samples/binaries/simple_asm/program.hex ./insns.hex
 # Get the firtool and put it in the right place
 ARG FIR_NAME="firtool-type-dbg-info"
-RUN curl -L "https://github.com/rameloni/circt/releases/download/v0.1.5-tywaves-SNAPSHOT/firtool-bin-linux-x64.tar.gz" | tar zx
-RUN chmod +x bin/${FIR_NAME}-0.1.5 && mv bin/${FIR_NAME}-0.1.5 /usr/bin/${FIR_NAME}-0.1.6 && rm -r bin
-
-RUN apt-get update && apt-get install -y libwebkit2gtk-4.1-dev && rm -rf /var/cache/apt/archives /var/lib/apt/lists/*
+RUN curl -L "https://github.com/rameloni/circt/releases/download/v0.1.5-tywaves-SNAPSHOT/firtool-bin-linux-x64.tar.gz" | tar zx && \
+    chmod +x bin/${FIR_NAME}-0.1.5 &&  \
+    mv bin/${FIR_NAME}-0.1.5 /usr/bin/${FIR_NAME}-0.1.6 &&  \
+    rm -r bin
 
 # Scala libs
 COPY --from=java-chisel /root/.ivy2/local/ /root/.ivy2/local/
