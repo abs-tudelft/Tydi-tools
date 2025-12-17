@@ -52,6 +52,54 @@ RUN npm i @tauri-apps/plugin-opener@~2.4 --no-cache
 WORKDIR /usr/src/chiseltrace
 RUN cargo tauri build --no-bundle
 
+FROM eclipse-temurin:25 AS java-builder-base
+RUN apt-get update && \
+    apt-get install -y curl git && \
+    rm -rf /var/cache/apt/archives /var/lib/apt/lists/*
+
+ENV SBT_VERSION=1.11.7
+
+# Install sbt
+RUN curl -fsL --show-error "https://github.com/sbt/sbt/releases/download/v$SBT_VERSION/sbt-$SBT_VERSION.tgz" | tar xfz - -C /usr/share && \
+    chown -R root:root /usr/share/sbt && \
+    chmod -R 755 /usr/share/sbt && \
+    ln -s /usr/share/sbt/bin/sbt /usr/local/bin/sbt
+
+FROM java-builder-base AS java-tydi-libs
+
+WORKDIR /usr/src/
+# Get Tydi-Chisel and execute a local publish
+RUN git clone --depth 1 https://github.com/abs-tudelft/Tydi-Chisel.git
+WORKDIR /usr/src/Tydi-Chisel
+RUN sbt publishLocal
+
+WORKDIR /usr/src/
+# Get Tydi-Chisel and execute a local publish
+RUN git clone --depth 1 https://github.com/abs-tudelft/ScalaTydiPayloadKit.git
+WORKDIR /usr/src/ScalaTydiPayloadKit/lib
+RUN sbt publishLocal
+
+WORKDIR /usr/src/
+# Get Tydi-Chisel and execute a local publish
+RUN git clone --depth 1 https://github.com/abs-tudelft/TydiPostProcessorDemo.git
+WORKDIR /usr/src/TydiPostProcessorDemo
+RUN sbt publishLocal
+
+FROM java-builder-base AS java-chisel
+
+WORKDIR /usr/src/
+# Get the ChiselTrace version of Chisel and execute a local publish
+RUN git clone https://github.com/jarlb/chisel.git
+WORKDIR /usr/src/chisel
+RUN git checkout chiseltrace
+RUN sbt "unipublish / publishLocal"
+
+WORKDIR /usr/src/
+# Get Tywaves-Chisel and execute a local publish
+RUN git clone --depth 1 https://github.com/jarlb/tywaves-chisel.git
+WORKDIR /usr/src/tywaves-chisel
+RUN sbt publishLocal
+
 # amd64 must be used as there is no aarch64 build available for firtool
 FROM --platform=linux/amd64 python:3.12-trixie AS python
 LABEL authors="Casper Cromjongh"
@@ -95,23 +143,7 @@ RUN scala-cli chisel-example.scala
 # Link the java version that scala-cli downloads to the system location
 RUN ln -s $(find -O3 $COURSIER_CACHE/arc/https/github.com/adoptium/temurin17-binaries -name java) /usr/bin/java
 
-WORKDIR /usr/src/
-# Get Tydi-Chisel and execute a local publish
-RUN git clone --depth 1 https://github.com/abs-tudelft/Tydi-Chisel.git
-WORKDIR /usr/src/Tydi-Chisel
-RUN sbt publishLocal
-
-WORKDIR /usr/src/
-# Get Tydi-Chisel and execute a local publish
-RUN git clone --depth 1 https://github.com/abs-tudelft/ScalaTydiPayloadKit.git
-WORKDIR /usr/src/ScalaTydiPayloadKit/lib
-RUN sbt publishLocal
-
-WORKDIR /usr/src/
-# Get Tydi-Chisel and execute a local publish
-RUN git clone --depth 1 https://github.com/abs-tudelft/TydiPostProcessorDemo.git
-WORKDIR /usr/src/TydiPostProcessorDemo
-RUN sbt publishLocal
+COPY --from=java-tydi-libs /root/.ivy2/local/ /root/.ivy2/local/
 
 # Copy executables compiled in the Rust image
 COPY --from=rust-tydi-lang /usr/src/tydi-lang-2/target/release/tydi-lang-complier /usr/bin/
@@ -126,21 +158,6 @@ RUN tydi-lang-complier -c tydi_passthrough_project.toml
 RUN tl2chisel output/ output/json_IR.json
 RUN scala-cli output/json_IR_generation_stub.scala output/json_IR_main.scala
 
-RUN apt-get install -y ibwebkit2gtk-4.1-dev && rm -rf /var/cache/apt/archives /var/lib/apt/lists/*
-
-WORKDIR /usr/src/
-# Get the ChiselTrace version of Chisel and execute a local publish
-RUN git clone https://github.com/jarlb/chisel.git
-WORKDIR /usr/src/chisel
-RUN git checkout chiseltrace
-RUN sbt "unipublish / publishLocal"
-
-WORKDIR /usr/src/
-# Get Tywaves-Chisel and execute a local publish
-RUN git clone --depth 1 https://github.com/jarlb/tywaves-chisel.git
-WORKDIR /usr/src/tywaves-chisel
-RUN sbt publishLocal
-
 WORKDIR /usr/src/
 # Get the Chiselwatt demo
 RUN git clone --depth 1 https://github.com/jarlb/chiselwatt.git
@@ -152,6 +169,11 @@ ARG FIR_NAME="firtool-type-dbg-info"
 RUN curl -L "https://github.com/rameloni/circt/releases/download/v0.1.5-tywaves-SNAPSHOT/firtool-bin-linux-x64.tar.gz" | tar zx
 RUN chmod +x bin/${FIR_NAME}-0.1.5 && mv bin/${FIR_NAME}-0.1.5 /usr/bin/${FIR_NAME}-0.1.6 && rm -r bin
 
+RUN apt-get update && apt-get install -y libwebkit2gtk-4.1-dev && rm -rf /var/cache/apt/archives /var/lib/apt/lists/*
+
+# Scala libs
+COPY --from=java-chisel /root/.ivy2/local/ /root/.ivy2/local/
+# chiseltrace and tywaves binaries
 COPY --from=rust-chiseltrace /usr/src/chiseltrace/target/release/chiseltrace /usr/bin/
 COPY --from=rust-tywaves /usr/src/surfer-tywaves/target/release/surfer-tywaves /usr/bin/
 # For some reason a specific name is required for surfer
