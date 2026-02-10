@@ -141,11 +141,6 @@ RUN echo "n" | cs setup --apps sbt,scala-cli --install-dir /usr/bin && \
 WORKDIR /root
 # Download and run chisel example file to fetch dependencies
 RUN curl -O -L https://github.com/chipsalliance/chisel/releases/latest/download/chisel-example.scala
-RUN scala-cli chisel-example.scala &&  \
-    rm -rf $COURSIER_CACHE/https
-
-# Link the java version that scala-cli downloads to the system location
-RUN ln -s $(find -O3 $COURSIER_CACHE/arc/https/github.com/adoptium/temurin17-binaries -name java) /usr/bin/java
 
 COPY --from=java-tydi-libs /root/.ivy2/local/ /root/.ivy2/local/
 
@@ -162,6 +157,9 @@ RUN tydi-lang-complier -c tydi_passthrough_project.toml
 RUN tl2chisel output/ output/json_IR.json
 RUN scala-cli output/json_IR_generation_stub.scala output/json_IR_main.scala &&  \
     rm -rf $COURSIER_CACHE/https
+
+# Link the java version that scala-cli downloads to the system location
+RUN ln -s $(find -O3 $COURSIER_CACHE/arc/https/github.com/adoptium/temurin17-binaries -name java) /usr/bin/java
 
 FROM tydi-tools-cli AS tydi-tools
 
@@ -196,3 +194,20 @@ RUN ln -s /usr/bin/surfer-tywaves /usr/bin/surfer-tywaves-0.3.3
 # It doesn't make much sense to run this in the build proces.
 
 CMD ["bash"]
+
+FROM tydi-tools AS tydi-tools-desktop
+LABEL authors="Casper Cromjongh"
+
+RUN apt-get update &&  \
+    apt-get install -y \
+        xfce4 \
+        xfce4-terminal \
+        x11vnc \
+        xvfb \
+        novnc \
+        websockify \
+        dbus-x11 && \
+    rm -rf /var/cache/apt/archives /var/lib/apt/lists/*
+
+COPY start-desktop.sh /usr/local/bin/
+CMD ["/usr/local/bin/start-desktop.sh"]
